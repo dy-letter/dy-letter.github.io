@@ -988,7 +988,7 @@ h1,h2,h3,p{margin:0}
   }
   .hero::before{height:40%}
   .hero-stage{gap:4px}
-  .char-img{max-height:min(40vh,280px)}
+  .char-img{max-height:min(42vh,300px); max-width:112%}
   .orb{width:40px; height:40px}
   .orb .ic{width:17px;height:17px}
   .orb-label{font-size:8.4px; max-width:7.4em}
