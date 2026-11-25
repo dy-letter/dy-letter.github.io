@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>토시이 숲</title>
-<meta name="theme-color" content="#EAF7E2">
+<title>도윤이숲</title>
+<meta name="theme-color" content="#DCEBF2">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="토시이 숲">
-<meta name="description" content="아이만 쓰는 토시이 숲 대시보드. 할 일 체크, 토시이 키우기, 쿠폰판, 기록, 준비물.">
+<meta name="apple-mobile-web-app-title" content="도윤이숲">
+<meta name="description" content="아이만 쓰는 도윤이숲 대시보드. 할 일 체크, 토시이 키우기, 쿠폰판, 기록, 준비물.">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
 <link rel="icon" type="image/png" href="assets/icon-192.png">
@@ -19,29 +19,22 @@
   <!-- ============ HOME / HERO ============ -->
   <section class="view is-active" id="view-home" data-view="home" aria-label="토시이 숲 홈">
     <div class="hero" id="hero">
-      <div class="watermark" aria-hidden="true">TOSHII</div>
-
       <header class="hero-top">
         <div class="logo">
           <button class="list-btn" id="btn-list" aria-label="목록 열기" aria-haspopup="dialog">
             <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>
           </button>
-          <span class="logo-mark" aria-hidden="true">🌿</span>
-          <span class="logo-text">토시이 숲</span>
+          <button class="home-name" id="btn-home" data-go="home" aria-label="도윤이숲 홈으로">도윤이숲</button>
         </div>
-        <button class="menu-btn" id="btn-menu" aria-label="메뉴 열기" aria-haspopup="dialog">
-          <span class="menu-face"><img src="assets/toshii-default.png" alt=""></span>
-          <span class="menu-word">MENU</span>
-        </button>
       </header>
 
       <div class="hero-title">
-        <div class="clock" id="clock">--:--</div>
-        <div class="dateline">
+        <div class="clock" id="clock" aria-label="지금 시각"><span class="clock-sr" id="clock-text">--:--</span></div>
+        <button class="dateline" id="dateline" data-go="supplies" aria-label="오늘 준비물 보기">
           <span id="today-date">오늘</span>
           <span class="sep" aria-hidden="true">·</span>
-          <span id="next-hint">다음 일정을 찾는 중</span>
-        </div>
+          <span class="supply-brief" id="supply-brief">준비물: 없음</span>
+        </button>
       </div>
 
       <div class="hero-stage">
@@ -58,7 +51,7 @@
         <div class="center-col">
           <div class="char-stage" id="char-stage">
             <div class="sticker-layer" id="hero-stickers" aria-hidden="true"></div>
-            <img class="char-img" id="hero-char" src="assets/toshii-default.png" alt="토시이">
+            <img class="char-img" id="hero-char" src="assets/toshii-default.webp" alt="토시이">
             <div class="fx-layer" id="fx-layer" aria-hidden="true"></div>
           </div>
 
@@ -123,7 +116,7 @@
         <div class="deco-preview">
           <div class="deco-stage" id="deco-stage">
             <div class="deco-bg" aria-hidden="true"></div>
-            <img class="deco-img" id="deco-img" src="assets/toshii-default.png" alt="토시이">
+            <img class="deco-img" id="deco-img" src="assets/toshii-default.webp" alt="토시이">
             <div class="sticker-layer" id="deco-stickers"></div>
           </div>
           <div class="deco-meta">
@@ -323,7 +316,7 @@
 <div class="overlay" id="menu-overlay" role="dialog" aria-modal="true" aria-label="목록" hidden>
   <div class="sheet menu-sheet">
     <div class="sheet-head">
-      <h2>토시이 숲</h2>
+      <h2>도윤이숲</h2>
       <button class="close-btn" id="btn-menu-close" aria-label="닫기">✕</button>
     </div>
     <div class="menu-grid" id="menu-grid">

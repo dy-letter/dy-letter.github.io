@@ -353,17 +353,141 @@
     var pct = next ? clamp(((g - lv.min) / (next.min - lv.min)) * 100, 0, 100) : 100;
     return { i: i, name: lv.name, emoji: lv.emoji, min: lv.min, next: next, toNext: next ? next.min - g : 0, pct: pct };
   }
-  function charSrc() { return (state && state.charImage) ? state.charImage : 'assets/toshii-default.png'; }
+  function charSrc() { return (state && state.charImage) ? state.charImage : 'assets/toshii-default.webp'; }
 
-  /* ---------------- render: home ---------------- */
+  /* ---------------- clock: hand-drawn collage digits ---------------- */
+  var CDIG = {
+    '0': 'M52 14 C29 12 16 38 16 68 C16 97 29 122 52 121 C74 120 86 96 85 68 C84 40 73 16 52 14 Z',
+    '1': 'M24 50 C36 41 48 27 58 12 C57 49 56 86 55 124',
+    '2': 'M19 44 C21 23 36 12 54 13 C73 14 84 27 82 45 C80 63 63 74 46 87 C33 97 24 108 19 123 C41 122 63 122 85 123',
+    '3': 'M22 33 C27 17 41 11 55 12 C71 13 81 24 79 40 C77 54 63 62 48 63 C67 64 82 72 82 91 C82 111 68 125 48 125 C33 125 22 117 17 105',
+    '4': 'M66 12 L22 84 L86 82 M66 40 L66 124',
+    '5': 'M80 15 C61 16 43 16 30 17 C27 37 26 49 25 60 C37 52 51 50 64 54 C80 59 86 73 85 90 C84 110 70 125 49 125 C35 125 24 117 19 105',
+    '6': 'M77 23 C66 14 51 15 39 26 C27 37 20 56 20 79 C20 104 34 125 54 125 C72 125 83 112 83 96 C83 79 70 66 54 66 C40 66 27 75 21 89',
+    '7': 'M18 15 C40 14 61 14 84 15 C73 45 62 83 60 125',
+    '8': 'M52 65 C35 63 25 54 26 37 C27 21 39 12 55 13 C70 14 79 24 78 39 C77 53 65 63 52 65 C35 67 25 77 25 95 C25 113 38 125 54 125 C70 125 80 113 80 95 C80 78 68 67 52 65 Z',
+    '9': 'M24 113 C33 122 47 125 59 119 C75 112 81 98 81 82 C81 62 70 48 52 48 C36 48 24 58 24 73 C24 88 36 98 51 98 C66 98 77 90 82 79'
+  };
+  var CTEX = {
+    red: { c: '#DE3A2B', p: 'p-red' },
+    blue: { c: '#26379B', p: 'p-blue' },
+    yellow: { c: '#D99211', p: 'p-yellow' },
+    green: { c: '#2F8E58', p: 'p-green' }
+  };
+  var CORDER = ['red', 'blue', 'yellow', 'green'];
+  var CROT = [-2.4, 1.8, -1.4, 2.6];
+  var CDY = [1, -2, 2, -1];
+  var CSW = [25, 24, 26, 24];
+  var CDW = 100, CGAP = 12, CCOLON = 40;
+  var clockKey = '';
+
+  function clockDefs() {
+    function pat(id, base, marks) {
+      return '<pattern id="' + id + '" width="12" height="12" patternUnits="userSpaceOnUse">' +
+        '<rect width="12" height="12" fill="' + base + '"/>' + marks + '</pattern>';
+    }
+    var dots = (function () {
+      var s = '';
+      for (var y = 0; y < 16; y += 6) for (var x = 0; x < 16; x += 6)
+        s += '<circle cx="' + (x + 2) + '" cy="' + (y + 2) + '" r="1.5" fill="#9E1B10" opacity=".85"/>';
+      return s;
+    })();
+    var waves = (function () {
+      var s = '';
+      for (var y = 2; y < 18; y += 5)
+        s += '<path d="M0 ' + y + ' q 3 -3 6 0 t 6 0 t 6 0" stroke="#131F63" stroke-width="1.5" fill="none" opacity=".8"/>';
+      return s;
+    })();
+    var stripes = (function () {
+      var s = '';
+      for (var x = -16; x < 20; x += 5)
+        s += '<path d="M' + x + ' -4 L' + (x + 12) + ' 18" stroke="#9A6406" stroke-width="1.7" opacity=".75"/>';
+      return s;
+    })();
+    var hatch = (function (c) {
+      var s = '';
+      for (var x = 0; x < 16; x += 4)
+        s += '<path d="M' + x + ' 0 L' + (x + 6) + ' 16" stroke="' + c + '" stroke-width="1.1" opacity=".5"/>';
+      for (var y = 0; y < 16; y += 6)
+        s += '<path d="M0 ' + y + ' L16 ' + (y + 2) + '" stroke="' + c + '" stroke-width="1" opacity=".38"/>';
+      return s;
+    })('#14512C');
+    var inkHatch = (function () {
+      var s = '';
+      for (var x = 0; x < 16; x += 4)
+        s += '<path d="M' + x + ' 0 L' + (x + 6) + ' 16" stroke="#000" stroke-width="1.2" opacity=".45"/>';
+      return s;
+    })();
+    return '<defs>' + pat('p-red', '#DE3A2B', dots) + pat('p-blue', '#26379B', waves) +
+      pat('p-yellow', '#E0A21A', stripes) + pat('p-green', '#2F8E58', hatch) +
+      pat('p-ink', '#2B2B2B', inkHatch) +
+      '<filter id="clk-rough" x="-12%" y="-12%" width="124%" height="124%">' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="9" result="n"/>' +
+      '<feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G"/>' +
+      '</filter></defs>';
+  }
+
+  function clockGlyph(ch, x, idx) {
+    var t = CTEX[CORDER[idx % CORDER.length]], sw = CSW[idx % 4], d = CDIG[ch] || '';
+    return '<g transform="translate(' + x + ' 0) rotate(' + CROT[idx % 4] + ' 50 70) translate(0 ' + CDY[idx % 4] + ')">' +
+      '<path d="' + d + '" fill="none" stroke="#FFFCF2" stroke-width="' + (sw + 19) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + t.c + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round" opacity=".3" transform="translate(2.5 -1.5)"/>' +
+      '<path d="' + d + '" fill="none" stroke="url(#' + t.p + ')" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '</g>';
+  }
+
+  function clockSVG(hh, mm) {
+    var x = 0, out = '';
+    out += clockGlyph(hh.charAt(0), 0, 0); x = CDW + CGAP;
+    out += clockGlyph(hh.charAt(1), x, 1); x += CDW + CGAP;
+    var cx = x + CCOLON / 2;
+    out += '<g><circle cx="' + cx + '" cy="44" r="10.5" fill="#FFFCF2" stroke="#FFFCF2" stroke-width="20"/>' +
+      '<circle cx="' + cx + '" cy="94" r="10.5" fill="#FFFCF2" stroke="#FFFCF2" stroke-width="20"/>' +
+      '<circle cx="' + cx + '" cy="44" r="10.5" fill="url(#p-ink)"/>' +
+      '<circle cx="' + cx + '" cy="94" r="10.5" fill="url(#p-ink)"/></g>';
+    x += CCOLON + CGAP;
+    out += clockGlyph(mm.charAt(0), x, 2); x += CDW + CGAP;
+    out += clockGlyph(mm.charAt(1), x, 3); x += CDW;
+    return '<svg class="clk-svg" viewBox="-18 -14 ' + (x + 36) + ' 172" aria-hidden="true" focusable="false">' + clockDefs() +
+      '<g filter="url(#clk-rough)">' + out + '</g></svg>';
+  }
+
   function renderClock() {
     var d = new Date();
+    var hh = pad2(d.getHours()), mm = pad2(d.getMinutes());
+    var key = hh + ':' + mm;
     var c = $('#clock');
-    if (c) c.textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    if (c && key !== clockKey) {
+      clockKey = key;
+      c.innerHTML = '<span class="clock-sr" id="clock-text">' + key + '</span>' + clockSVG(hh, mm);
+      c.setAttribute('aria-label', '지금 ' + prettyTime(key));
+    }
     var nt = $('#now-time');
-    if (nt) nt.textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    if (nt) nt.textContent = key;
     var td = $('#today-date');
     if (td) td.textContent = dateLabel(d);
+    renderSupplyBrief();
+  }
+
+  /* ---------------- dateline: date + 준비물 요약 ---------------- */
+  var briefKey = '';
+  function supplyBriefText() {
+    var list = (state && state.supplies && state.supplies.today) || [];
+    if (!list.length) return '준비물: 없음';
+    var left = [];
+    for (var i = 0; i < list.length; i++) if (!list[i].done) left.push(list[i].text);
+    if (!left.length) return '준비물: 다 챙김';
+    return '준비물: ' + left.join(', ');
+  }
+  function renderSupplyBrief() {
+    var el = $('#supply-brief');
+    var txt = supplyBriefText();
+    if (el && txt !== briefKey) { briefKey = txt; el.textContent = txt; }
+    var dl = $('#dateline');
+    if (dl) {
+      var n = nextSchedule();
+      dl.setAttribute('aria-label', (n ? '다음 일정 ' + prettyTime(n.time) + ' ' + n.label + '. ' : '') + '오늘 준비물 보기');
+    }
   }
 
   function nextSchedule() {
@@ -376,12 +500,8 @@
   }
 
   function renderHint() {
-    var el = $('#next-hint');
-    if (!el) return;
-    var n = nextSchedule();
-    if (n) el.textContent = prettyTime(n.time) + ' ' + n.label + ' 시간';
-    else if (state.schedule.length) el.textContent = '오늘 일정은 다 끝났어요';
-    else el.textContent = '시간표를 만들어 보자';
+    /* 시계 아래 줄은 날짜 + 준비물 요약을 씁니다 (다음 일정은 화면 읽기용 라벨에 담아요) */
+    renderSupplyBrief();
   }
 
   function renderHero() {
@@ -413,9 +533,6 @@
 
     var img = $('#hero-char');
     if (img && img.getAttribute('src') !== charSrc()) img.setAttribute('src', charSrc());
-    var menuImg = $('.menu-face img');
-    if (menuImg) menuImg.setAttribute('src', charSrc());
-
     var nb = $('#hero-name');
     if (nb) nb.innerHTML = '토시이<span class="age">· ' + AGE + '살</span>';
     var bl = $('#badge-level'); if (bl) bl.textContent = 'Lv.' + (levelInfo().i + 1);
@@ -580,6 +697,7 @@
 
     var done = s.today.filter(function (x) { return x.done; }).length;
     var sc = $('#supply-count'); if (sc) sc.textContent = done + '/' + s.today.length;
+    renderSupplyBrief();
   }
 
   /* ---------------- render: toshi ---------------- */
@@ -1138,7 +1256,6 @@
     var nb = $('#nav-back'); if (nb) nb.addEventListener('click', function () { stepView(-1); });
     var nn = $('#nav-next'); if (nn) nn.addEventListener('click', function () { stepView(1); });
     var bl = $('#btn-list'); if (bl) bl.addEventListener('click', openMenu);
-    var bm = $('#btn-menu'); if (bm) bm.addEventListener('click', openMenu);
     var bmc = $('#btn-menu-close'); if (bmc) bmc.addEventListener('click', closeMenu);
     var mo = $('#menu-overlay');
     if (mo) mo.addEventListener('click', function (e) { if (e.target === mo) closeMenu(); });
