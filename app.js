@@ -1,4 +1,5 @@
 /* 토시이 숲 — 아이 전용 대시보드
+   홈 · 토시이 · 쿠폰판 · 기록 · 준비물
    순수 HTML/CSS/JS · 외부 요청 없음 · localStorage 자동 저장 */
 (function () {
   'use strict';
@@ -46,6 +47,9 @@
     { id: 's7', time: '21:10', icon: '🌙', label: '잠자리' }
   ];
 
+  var FEEDS = ['🍖', '🥕', '🥦', '🍎', '🍇', '🍌'];
+  var COUPON_MAX = 30;
+
   var MESSAGES = [
     '오늘의 미션: 책 10쪽 읽기! 다 하면 토시이한테 먹이를 주자. 🦖',
     '씻고 양치하면 토시이가 폴짝 기뻐해. 하나씩 해 보자!',
@@ -55,9 +59,9 @@
     '잘했어! 스스로 끝낸 일은 절대 사라지지 않아.',
     '9시까지 자면 내일 키가 쑥! 잠자리 준비도 오늘의 미션이다.',
     '먹이를 주면 토시이가 자라. 오늘은 몇 살이 될까?',
-    '물 한 컵 마시고 시작하자. 몸이 먼저 준비되면 공부도 잘 돼.',
+    '아침 네 개, 저녁 여섯 개. 다 하면 오늘 하루 완벽!',
     '모르는 건 틀린 게 아니야. 물어보는 게 제일 용감한 거란다.',
-    '아침 네 개, 저녁 여섯 개. 다 하면 오늘 하루 완벽!'
+    '10칸을 다 채우면 토시이가 맛있는 걸 먹고 쿠폰 도장도 하나 찍혀!'
   ];
 
   var STICKERS = ['⭐', '💎', '🌈', '🌸', '🍀', '🦋', '🎀', '👑', '🍓', '🍄', '🌙', '☁️', '🍬', '✨', '🕶️', '🎈'];
@@ -98,6 +102,10 @@
     var dow = '일월화수목금토'[d.getDay()];
     return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + dow + ')';
   }
+  function shortDate(d) {
+    d = d || new Date();
+    return (d.getMonth() + 1) + '월 ' + d.getDate() + '일';
+  }
   function weekStart(d) {
     d = d || new Date();
     var t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -119,19 +127,30 @@
   /* ---------------- state ---------------- */
   var state = null;
 
+  function freshSupplies() {
+    return {
+      date: '',
+      today: [
+        { id: uid('p'), text: '물통', done: false },
+        { id: uid('p'), text: '알림장', done: false }
+      ],
+      tomorrow: []
+    };
+  }
+
   function fresh() {
     return {
-      version: 2,
+      version: 3,
       todos: cloneTodos(DEFAULT_TODOS),
       daily: { date: '', done: [] },
+      history: {},
       heroGroup: 'auto',
       heroGroupDate: '',
       rewardDate: '',
       feeds: 0,
       growth: 0,
-      gems: 0,
-      stamps: {},
-      weekReward: '',
+      coupon: { filled: 0, completed: 0 },
+      supplies: freshSupplies(),
       schedule: DEFAULT_SCHEDULE.map(function (s) { return { id: s.id, time: s.time, icon: s.icon, label: s.label }; }),
       messageIndex: Math.floor(Math.random() * MESSAGES.length),
       customMessage: '',
@@ -153,13 +172,23 @@
         if (saved[k] === undefined || saved[k] === null) return;
         base[k] = saved[k];
       });
-      // v1(배열) → v2(아침/저녁) 마이그레이션
       if (!base.todos || Array.isArray(base.todos) || !Array.isArray(base.todos.morning) || !Array.isArray(base.todos.evening)) {
         base.todos = cloneTodos(DEFAULT_TODOS);
       }
-      if (!Array.isArray(base.schedule)) base.schedule = fresh().schedule;
+      if (!Array.isArray(base.schedule) || !base.schedule.length) base.schedule = fresh().schedule;
       if (!base.daily || !Array.isArray(base.daily.done)) base.daily = { date: '', done: [] };
       if (!Array.isArray(base.stickers)) base.stickers = [];
+      if (!base.history || typeof base.history !== 'object' || Array.isArray(base.history)) base.history = {};
+      if (!base.coupon || typeof base.coupon !== 'object') {
+        var legacy = saved.stamps && typeof saved.stamps === 'object' ? Object.keys(saved.stamps).length : 0;
+        base.coupon = { filled: Math.min(COUPON_MAX - 1, legacy), completed: 0 };
+      }
+      base.coupon.filled = clamp(parseInt(base.coupon.filled, 10) || 0, 0, COUPON_MAX);
+      base.coupon.completed = Math.max(0, parseInt(base.coupon.completed, 10) || 0);
+      if (!base.supplies || typeof base.supplies !== 'object' || !Array.isArray(base.supplies.today)) {
+        base.supplies = freshSupplies();
+      }
+      if (!Array.isArray(base.supplies.tomorrow)) base.supplies.tomorrow = [];
       return base;
     } catch (e) {
       return base;
@@ -177,14 +206,32 @@
   }
 
   function rollDay() {
+    var changed = false;
     var today = dateKey();
     if (state.daily.date !== today) {
+      if (state.daily.date && state.daily.done.length) {
+        state.history[state.daily.date] = state.daily.done.length;
+      }
       state.daily = { date: today, done: [] };
       state.heroGroup = 'auto';
       state.heroGroupDate = '';
-      return true;
+      changed = true;
     }
-    return false;
+    // 준비물: 내일 → 오늘로 넘기기
+    if (state.supplies.date !== today) {
+      if (state.supplies.date) {
+        state.supplies.today = (state.supplies.tomorrow || []).map(function (x) {
+          return { id: uid('p'), text: x.text, done: false };
+        });
+        state.supplies.tomorrow = [];
+      }
+      state.supplies.date = today;
+      changed = true;
+    }
+    if (changed) {
+      state.history[today] = state.daily.done.length;
+    }
+    return changed;
   }
 
   /* ---------------- sound ---------------- */
@@ -227,7 +274,7 @@
     toastTimer = setTimeout(function () {
       toastEl.classList.remove('show');
       setTimeout(function () { toastEl.hidden = true; }, 220);
-    }, 2200);
+    }, 2600);
   }
 
   function floatFx(glyph, className) {
@@ -244,8 +291,8 @@
   function celebrate() {
     var layer = $('#celebrate-layer');
     if (!layer) return;
-    var glyphs = ['⭐', '💎', '🌸', '🍀', '✨', '🎉', '🦖'];
-    for (var i = 0; i < 18; i++) {
+    var glyphs = ['⭐', '🎁', '🌸', '🍀', '✨', '🎉', '🦖'];
+    for (var i = 0; i < 20; i++) {
       var s = document.createElement('span');
       s.className = 'confetti';
       s.textContent = glyphs[i % glyphs.length];
@@ -348,8 +395,7 @@
 
     var toggle = $('#btn-group');
     if (toggle) {
-      toggle.setAttribute('aria-label', GROUPS[g].long + ' ' + groupDone(g) + '개 중 ' + groupDone(g) + '개 완료. 눌러서 ' +
-        (g === 'morning' ? '저녁' : '아침') + ' 루틴 보기');
+      toggle.setAttribute('aria-label', GROUPS[g].long + ' ' + items.length + '개 중 ' + groupDone(g) + '개 완료. 눌러서 다른 루틴 보기');
     }
     var gi = $('#group-ico'); if (gi) gi.textContent = GROUPS[g].icon;
     var gn = $('#group-name'); if (gn) gn.textContent = GROUPS[g].name;
@@ -357,14 +403,12 @@
 
     var todosBox = $('#hero-todos');
     if (todosBox) {
-      var html = '';
-      items.forEach(function (t) {
+      todosBox.innerHTML = items.map(function (t) {
         var on = isDone(t.id);
-        html += '<button class="todo-orb-btn" data-todo="' + esc(t.id) + '" aria-pressed="' + on + '" aria-label="' + esc(t.label) + (on ? ' 끝냄' : ' 하기') + '">' +
+        return '<button class="todo-orb-btn" data-todo="' + esc(t.id) + '" aria-pressed="' + on + '" aria-label="' + esc(t.label) + (on ? ' 끝냄' : ' 하기') + '">' +
           '<span class="todo-orb"><span class="orb-ico">' + esc(t.icon) + '</span><span class="orb-txt">' + esc(t.label) + '</span></span>' +
           '</button>';
-      });
-      todosBox.innerHTML = html;
+      }).join('');
     }
 
     var img = $('#hero-char');
@@ -376,15 +420,15 @@
     if (nb) nb.innerHTML = '토시이<span class="age">· ' + AGE + '살</span>';
     var bl = $('#badge-level'); if (bl) bl.textContent = 'Lv.' + (levelInfo().i + 1);
     var bg = $('#badge-growth'); if (bg) bg.textContent = '먹이 ' + state.growth;
-    var bt = $('#badge-today'); if (bt) bt.textContent = '오늘 ' + doneCount() + '/' + totalTodos();
 
     var gauge = $('#day-gauge');
     if (gauge) {
       var n = doneCount(), segs = '';
-      for (var gi2 = 0; gi2 < 10; gi2++) segs += '<span class="gauge-seg' + (gi2 < n ? ' on' : '') + '"></span>';
+      var max = Math.max(10, totalTodos());
+      for (var gi2 = 0; gi2 < max; gi2++) segs += '<span class="gauge-seg' + (gi2 < n ? ' on' : '') + '"></span>';
       gauge.innerHTML = segs;
       gauge.setAttribute('aria-valuenow', n);
-      gauge.setAttribute('aria-valuemax', totalTodos());
+      gauge.setAttribute('aria-valuemax', max);
       var gcount = $('#gauge-count'); if (gcount) gcount.textContent = n + '/' + totalTodos();
     }
 
@@ -396,10 +440,9 @@
     if (dt) dt.textContent = state.customMessage || MESSAGES[state.messageIndex % MESSAGES.length];
 
     renderPlacedStickers();
-    renderDecoPreview();
   }
 
-  /* ---------------- render: todo ---------------- */
+  /* ---------------- render: todo editor ---------------- */
   function taskRow(t, on) {
     return '<div class="task-row' + (on ? ' done' : '') + '">' +
       '<button class="task-main" data-todo="' + esc(t.id) + '" aria-pressed="' + on + '">' +
@@ -430,74 +473,169 @@
     var pf = $('#progress-feeds'); if (pf) pf.textContent = '먹이 ' + state.feeds + '개 있어요';
     var tc = $('#todo-count'); if (tc) tc.textContent = doneCount() + '/' + totalTodos();
     var ts = $('#todo-sub');
-    if (ts) ts.textContent = allDone() ? '오늘 목표 달성! 도장을 찍어 보자 ⭐' : '아침 4개 · 저녁 6개, 끝낼 때마다 먹이 1개!';
+    if (ts) ts.textContent = allDone() ? '오늘 목표 달성! 쿠폰 도장도 확인해 봐 🎟️' : '아침 4개 · 저녁 6개, 끝낼 때마다 먹이 1개!';
   }
 
-  /* ---------------- render: stamp ---------------- */
-  function weekStampCount() {
-    var n = 0;
-    weekDates().forEach(function (d) { if (state.stamps[dateKey(d)]) n++; });
-    return n;
-  }
-
-  function renderStamp() {
-    var today = dateKey();
-    var stamped = !!state.stamps[today];
-    var ready = allDone();
-
-    var face = $('#stamp-face');
-    if (face) { face.textContent = '🐾'; face.classList.toggle('on', stamped); }
-    var st = $('#stamp-title');
-    if (st) st.textContent = stamped ? '오늘 도장 완료!' : '오늘 도장';
-    var sd = $('#stamp-desc');
-    if (sd) sd.textContent = stamped ? '오늘도 목표 달성! 내일 또 만나자'
-      : (ready ? '지금 찍을 수 있어요!' : '할 일 ' + totalTodos() + '개를 다 하면 찍을 수 있어요 (' + doneCount() + '/' + totalTodos() + ')');
-    var btn = $('#btn-stamp');
-    if (btn) {
-      btn.disabled = stamped || !ready;
-      btn.textContent = stamped ? '오늘 도장 찍었어요 🐾' : '오늘 도장 찍기';
-    }
-
-    var grid = $('#week-grid');
+  /* ---------------- render: coupon ---------------- */
+  function renderCoupon() {
+    var filled = clamp(state.coupon.filled, 0, COUPON_MAX);
+    var grid = $('#coupon-grid');
     if (grid) {
-      var names = ['월', '화', '수', '목', '금', '토', '일'];
       var h = '';
-      weekDates().forEach(function (d, idx) {
-        var key = dateKey(d);
-        var on = !!state.stamps[key];
-        h += '<div class="day-cell' + (on ? ' on' : '') + (key === today ? ' today' : '') + '">' +
-          '<span class="day-name">' + names[idx] + '</span>' +
-          '<span class="day-num">' + d.getDate() + '</span>' +
-          '<span class="day-stamp">' + (on ? '🐾' : '') + '</span>' +
-          '</div>';
-      });
+      for (var i = 0; i < COUPON_MAX; i++) {
+        var on = i < filled;
+        h += '<div class="coupon-cell' + (on ? ' on' : '') + (on && i === filled - 1 ? ' pop' : '') + '">' +
+          (on ? '🐾' : (i + 1)) + '</div>';
+      }
       grid.innerHTML = h;
     }
+    var cc = $('#coupon-count'); if (cc) cc.textContent = filled + '/' + COUPON_MAX;
+    var cd = $('#coupon-done'); if (cd) cd.textContent = '지금까지 ' + state.coupon.completed + '판 완성';
+    var desc = $('#coupon-desc');
+    if (desc) desc.textContent = filled >= COUPON_MAX ? '다 모았어요! 선물을 받아요' : (COUPON_MAX - filled) + '개 더 모으면 작은 선물!';
+    var gift = $('#gift-card');
+    if (gift) gift.hidden = filled < COUPON_MAX;
+    var card = $('#coupon-card');
+    if (card) card.classList.toggle('full', filled >= COUPON_MAX);
+  }
 
-    var wc = weekStampCount();
-    var rt = $('#reward-title'); if (rt) rt.textContent = '이번 주 ' + wc + '/5 도장';
-    var rb = $('#btn-reward');
-    var wk = dateKey(weekStart());
-    if (rb) {
-      if (state.weekReward === wk) { rb.disabled = true; rb.textContent = '이번 주 보상 완료'; }
-      else if (wc >= 5) { rb.disabled = false; rb.textContent = '보석 받기 💎'; }
-      else { rb.disabled = true; rb.textContent = '보석 받기'; }
+  /* ---------------- render: record ---------------- */
+  function historyCount(keys) {
+    var n = 0;
+    keys.forEach(function (k) { n += (parseInt(state.history[k], 10) || 0); });
+    return n;
+  }
+  function renderRecord() {
+    var weekKeys = weekDates().map(function (d) { return dateKey(d); });
+    var week = historyCount(weekKeys);
+    var today = new Date();
+    var monthKeys = [];
+    for (var d = 1; d <= new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate(); d++) {
+      monthKeys.push(today.getFullYear() + '-' + pad2(today.getMonth() + 1) + '-' + pad2(d));
+    }
+    var month = historyCount(monthKeys);
+
+    var wn = $('#week-num'); if (wn) wn.textContent = week;
+    var mn = $('#month-num'); if (mn) mn.textContent = month;
+    var rt = $('#record-today'); if (rt) rt.textContent = '오늘 ' + doneCount() + '개';
+
+    var wk = $('#week-note');
+    if (wk) wk.textContent = week === 0 ? '이번 주도 하나씩 해 보자!' : (week >= 30 ? '이번 주 최고! 정말 잘했어' : '이번 주도 잘 가고 있어요');
+
+    var dots = $('#week-dots');
+    if (dots) {
+      dots.innerHTML = weekKeys.map(function (k) {
+        return '<i class="' + ((parseInt(state.history[k], 10) || 0) > 0 ? 'on' : '') + '"></i>';
+      }).join('');
     }
 
-    var shelf = $('#sticker-shelf');
-    if (shelf) {
-      var earned = [];
-      weekDates().forEach(function (d, i) { if (state.stamps[dateKey(d)]) earned.push(i); });
-      if (!earned.length) {
-        shelf.innerHTML = '<span class="hint-inline">아직 모은 스티커가 없어요. 도장을 찍으면 하나씩 늘어나요.</span>';
+    var fill = $('#month-fill');
+    if (fill) {
+      var days = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      fill.style.width = clamp((month / (days * totalTodos())) * 100, 0, 100) + '%';
+    }
+    var mnote = $('#month-note');
+    if (mnote) mnote.textContent = month === 0 ? '이번 달 첫 체크를 기다리는 중' : (month + '개나 해냈어요!');
+
+    var bestKey = '', bestVal = 0;
+    Object.keys(state.history).forEach(function (k) {
+      var v = parseInt(state.history[k], 10) || 0;
+      if (v > bestVal) { bestVal = v; bestKey = k; }
+    });
+    var bt = $('#best-title'); if (bt) bt.textContent = '가장 많이 한 날';
+    var bd = $('#best-desc');
+    if (bd) {
+      if (bestKey) {
+        var p = bestKey.split('-');
+        bd.textContent = (parseInt(p[1], 10)) + '월 ' + (parseInt(p[2], 10)) + '일 · ' + bestVal + '개';
       } else {
-        shelf.innerHTML = earned.map(function (i) {
-          return '<span class="sticker-pick" aria-hidden="true">' + ['🌸', '🍀', '⭐', '🦋', '💎', '🌈', '🎀'][i % 7] + '</span>';
-        }).join('');
+        bd.textContent = '아직 기록이 없어요';
       }
     }
+  }
 
-    var gc = $('#gem-count'); if (gc) gc.textContent = '💎 ' + state.gems;
+  /* ---------------- render: supplies ---------------- */
+  function supplyList(list, which) {
+    if (!list.length) return '<p class="supply-empty">아직 없어요. 아래 버튼으로 추가해 보세요.</p>';
+    return list.map(function (it) {
+      return '<div class="supply-item' + (it.done ? ' done' : '') + '">' +
+        '<button class="supply-check" data-supply="' + which + '" data-sid="' + esc(it.id) + '" aria-pressed="' + !!it.done + '" aria-label="' + esc(it.text) + (it.done ? ' 체크 해제' : ' 체크') + '">✓</button>' +
+        '<span class="supply-text">' + esc(it.text) + '</span>' +
+        '<button class="supply-del" data-supply-del="' + which + '" data-sid="' + esc(it.id) + '" aria-label="' + esc(it.text) + ' 지우기">✕</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  function renderSupplies() {
+    var s = state.supplies;
+    var t = $('#supply-today');
+    if (t) t.innerHTML = supplyList(s.today, 'today');
+    var tm = $('#supply-tomorrow');
+    if (tm) tm.innerHTML = supplyList(s.tomorrow, 'tomorrow');
+
+    var now = new Date();
+    var tmr = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    var sd = $('#supply-today-date'); if (sd) sd.textContent = shortDate(now);
+    var sd2 = $('#supply-tomorrow-date'); if (sd2) sd2.textContent = shortDate(tmr);
+
+    var done = s.today.filter(function (x) { return x.done; }).length;
+    var sc = $('#supply-count'); if (sc) sc.textContent = done + '/' + s.today.length;
+  }
+
+  /* ---------------- render: toshi ---------------- */
+  function renderPlacedStickers() {
+    var positions = state.stickers || [];
+    ['#hero-stickers', '#deco-stickers'].forEach(function (sel) {
+      var layer = $(sel);
+      if (!layer) return;
+      layer.innerHTML = '';
+      positions.forEach(function (s) {
+        var el = document.createElement('span');
+        el.className = 'sticker';
+        el.textContent = s.emoji;
+        el.style.left = s.x + '%';
+        el.style.top = s.y + '%';
+        if (sel === '#deco-stickers') {
+          el.setAttribute('role', 'button');
+          el.setAttribute('aria-label', s.emoji + ' 스티커 떼기');
+          el.dataset.sticker = s.id;
+        } else {
+          el.style.pointerEvents = 'none';
+        }
+        layer.appendChild(el);
+      });
+    });
+  }
+
+  function renderToshi() {
+    var img = $('#deco-img');
+    if (img && img.getAttribute('src') !== charSrc()) img.setAttribute('src', charSrc());
+    var lv = levelInfo();
+    var dl = $('#deco-level'); if (dl) dl.textContent = 'Lv.' + (lv.i + 1) + ' ' + lv.name;
+    var de = $('#deco-eaten'); if (de) de.textContent = '지금까지 먹은 먹이 ' + state.growth + '개';
+    var df = $('#deco-fill'); if (df) df.style.width = lv.pct + '%';
+    var dn = $('#deco-next');
+    if (dn) dn.textContent = lv.next ? ('다음 성장까지 먹이 ' + lv.toNext + '개') : '마지막 단계까지 왔어요!';
+    var top = $('#toshi-level-top'); if (top) top.textContent = 'Lv.' + (lv.i + 1);
+
+    var shelf = $('#deco-shelf');
+    if (shelf) {
+      shelf.innerHTML = STICKERS.map(function (em) {
+        return '<button class="sticker-pick" data-sticker-add="' + em + '" aria-label="' + em + ' 스티커 붙이기">' + em + '</button>';
+      }).join('');
+    }
+    var book = $('#book-grid');
+    if (book) {
+      book.innerHTML = LEVELS.map(function (lv2) {
+        var unlocked = state.growth >= lv2.min;
+        return '<div class="book-card' + (unlocked ? '' : ' locked') + '">' +
+          '<span class="book-emoji">' + (unlocked ? lv2.emoji : '🔒') + '</span>' +
+          '<span class="book-name">' + lv2.name + '</span>' +
+          '<span class="book-req">먹이 ' + lv2.min + '개</span>' +
+          '</div>';
+      }).join('');
+    }
+    renderPlacedStickers();
   }
 
   /* ---------------- render: schedule ---------------- */
@@ -508,10 +646,9 @@
   function renderCountdown() {
     var now = minutesNow();
     var sorted = sortedSchedule();
-    var next = null, cur = null;
+    var next = null;
     for (var i = 0; i < sorted.length; i++) {
       if (minutesOf(sorted[i].time) > now) { next = sorted[i]; break; }
-      cur = sorted[i];
     }
     var label = $('#cd-label'), main = $('#cd-main'), sub = $('#cd-sub'), fill = $('#cd-fill');
     if (!label) return;
@@ -526,7 +663,7 @@
       var pct = last > first ? clamp(((now - first) / (last - first)) * 100, 0, 100) : 0;
       if (fill) fill.style.width = pct + '%';
     } else {
-      label.textContent = cur ? '마지막 일정' : '오늘 일정';
+      label.textContent = '오늘 일정';
       if (main) main.textContent = sorted.length ? '오늘 일정 끝!' : '일정이 없어요';
       if (sub) sub.textContent = sorted.length ? '내일 다시 만나요 🌙' : '＋ 로 일정을 추가해 보세요';
       if (fill) fill.style.width = sorted.length ? '100%' : '0%';
@@ -558,77 +695,21 @@
     if (!sorted.length) h = '<p class="hint-line">아직 시간표가 없어요. 아래 버튼으로 하나씩 추가해 보세요.</p>';
     list.innerHTML = h;
     var ss = $('#sched-sub');
-    if (ss) ss.textContent = nextId ? '다음 일정까지 남은 시간을 세고 있어요' : '오늘 일정을 다 마쳤어요';
-  }
-
-  /* ---------------- render: decorate ---------------- */
-  function renderDecoPreview() {
-    var img = $('#deco-img');
-    if (img && img.getAttribute('src') !== charSrc()) img.setAttribute('src', charSrc());
-    var lv = levelInfo();
-    var dl = $('#deco-level'); if (dl) dl.textContent = 'Lv.' + (lv.i + 1) + ' ' + lv.name;
-    var dg = $('#deco-growth'); if (dg) dg.textContent = '누적 먹이 ' + state.growth + '개 · 보석 ' + state.gems + '개';
-    var df = $('#deco-fill'); if (df) df.style.width = lv.pct + '%';
-    var dn = $('#deco-next');
-    if (dn) dn.textContent = lv.next ? ('다음 성장까지 먹이 ' + lv.toNext + '개') : '마지막 단계까지 왔어요!';
-    var dgem = $('#deco-gems'); if (dgem) dgem.textContent = '💎 ' + state.gems;
-    renderPlacedStickers();
-  }
-
-  function renderPlacedStickers() {
-    var positions = state.stickers || [];
-    ['#hero-stickers', '#deco-stickers'].forEach(function (sel) {
-      var layer = $(sel);
-      if (!layer) return;
-      layer.innerHTML = '';
-      positions.forEach(function (s) {
-        var el = document.createElement('span');
-        el.className = 'sticker';
-        el.textContent = s.emoji;
-        el.style.left = s.x + '%';
-        el.style.top = s.y + '%';
-        if (sel === '#deco-stickers') {
-          el.setAttribute('role', 'button');
-          el.setAttribute('aria-label', s.emoji + ' 스티커 떼기');
-          el.dataset.sticker = s.id;
-        } else {
-          el.style.pointerEvents = 'none';
-        }
-        layer.appendChild(el);
-      });
-    });
-  }
-
-  function renderDecorate() {
-    var shelf = $('#deco-shelf');
-    if (shelf) {
-      shelf.innerHTML = STICKERS.map(function (em) {
-        return '<button class="sticker-pick" data-sticker-add="' + em + '" aria-label="' + em + ' 스티커 붙이기">' + em + '</button>';
-      }).join('');
-    }
-    var book = $('#book-grid');
-    if (book) {
-      book.innerHTML = LEVELS.map(function (lv) {
-        var unlocked = state.growth >= lv.min;
-        return '<div class="book-card' + (unlocked ? '' : ' locked') + '">' +
-          '<span class="book-emoji">' + (unlocked ? lv.emoji : '🔒') + '</span>' +
-          '<span class="book-name">' + lv.name + '</span>' +
-          '<span class="book-req">먹이 ' + lv.min + '개</span>' +
-          '</div>';
-      }).join('');
-    }
-    renderDecoPreview();
+    if (ss) ss.textContent = nextId ? '홈에 ‘다음 일정’으로 보여요' : '오늘 일정을 다 마쳤어요';
   }
 
   function renderAll() {
     renderClock();
     renderHero();
     renderTodo();
-    renderStamp();
+    renderCoupon();
+    renderRecord();
+    renderSupplies();
+    renderToshi();
     renderSchedule();
-    renderDecorate();
   }
 
+  /* ---------------- reward ---------------- */
   function spawnSpark(stage) {
     var s = document.createElement('span');
     s.className = 'fx-spark';
@@ -640,7 +721,7 @@
     setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 1300);
   }
 
-  function celebrateDay() {
+  function celebrateDay(feedEmoji) {
     var gauge = $('#day-gauge');
     if (gauge) {
       gauge.classList.remove('sparkle');
@@ -652,7 +733,7 @@
     if (!stage) return;
     var feed = document.createElement('span');
     feed.className = 'feed-fly';
-    feed.textContent = '🍖';
+    feed.textContent = feedEmoji;
     stage.appendChild(feed);
     sound('pop');
     setTimeout(function () {
@@ -678,24 +759,35 @@
   function grantDayReward() {
     var today = dateKey();
     if (state.rewardDate === today) {
-      toast('오늘 할 일 10개를 모두 끝냈어요! 열 칸 완성 ⭐');
+      toast('오늘 할 일 10개를 모두 끝냈어요! 보상은 이미 받았어요');
       return;
     }
     var before = levelInfo().i;
+    var feedEmoji = FEEDS[Math.floor(Math.random() * FEEDS.length)];
     state.rewardDate = today;
     state.growth += 1;
+    var couponBefore = state.coupon.filled;
+    state.coupon.filled = clamp(state.coupon.filled + 1, 0, COUPON_MAX);
     var after = levelInfo();
     save();
-    renderHero();
-    try { document.body.dataset.reward = today; } catch (e) {}
+    renderAll();
+    try {
+      document.body.dataset.reward = today;
+      document.body.dataset.feed = feedEmoji;
+      document.body.dataset.coupon = String(state.coupon.filled);
+    } catch (e) {}
     if (current !== 'home') go('home');
-    celebrateDay();
+    celebrateDay(feedEmoji);
+
     setTimeout(function () {
-      if (after.i > before) {
-        toast('10칸 완성! 토시이가 먹이를 냠냠 🍖 Lv.' + (after.i + 1) + ' ' + after.name);
+      if (state.coupon.filled >= COUPON_MAX && couponBefore < COUPON_MAX) {
+        toast('쿠폰판 완성! 🎁 작은 선물을 받을 시간이에요');
+        celebrate();
+      } else if (after.i > before) {
+        toast('10칸 완성! 토시이가 ' + feedEmoji + '를 냠냠 🍽️ Lv.' + (after.i + 1) + ' ' + after.name);
         celebrate();
       } else {
-        toast('10칸 완성! 토시이가 먹이를 냠냠 먹고 자랐어요 🍖');
+        toast('10칸 완성! 토시이가 ' + feedEmoji + '를 냠냠 먹고 쿠폰 도장 1개 🎟️');
       }
     }, 1450);
   }
@@ -728,6 +820,7 @@
         }
       }
     }
+    state.history[state.daily.date] = state.daily.done.length;
     save();
     renderAll();
   }
@@ -764,30 +857,22 @@
     }
   }
 
-  function stampToday() {
-    var today = dateKey();
-    if (state.stamps[today]) { toast('오늘 도장은 이미 찍었어요 🐾'); return; }
-    if (!allDone()) { toast('할 일을 다 하면 도장을 찍을 수 있어요! (' + doneCount() + '/' + totalTodos() + ')'); sound('nope'); return; }
-    state.stamps[today] = true;
-    state.gems += 1;
-    save();
-    renderAll();
-    celebrate();
-    sound('win');
-    toast('도장 완성! 보석 1개를 받았어요 💎');
-  }
-
-  function claimWeekReward() {
-    var wk = dateKey(weekStart());
-    if (state.weekReward === wk) return;
-    if (weekStampCount() < 5) { toast('도장 5개를 모으면 보석을 받을 수 있어요'); return; }
-    state.weekReward = wk;
-    state.gems += 5;
-    save();
-    renderAll();
-    celebrate();
-    sound('win');
-    toast('이번 주 보석 5개 획득! 💎💎💎');
+  function startNewCoupon() {
+    if (state.coupon.filled < COUPON_MAX) { toast('아직 30개를 다 모으지 않았어요'); return; }
+    openConfirm({
+      title: '새 쿠폰판 시작',
+      text: '완성한 쿠폰판을 접고 새 쿠폰판을 펼칠까요? 완성한 판은 기록에 남아요.',
+      okText: '새로 시작',
+      onOk: function () {
+        state.coupon.completed += 1;
+        state.coupon.filled = 0;
+        save();
+        renderAll();
+        celebrate();
+        sound('win');
+        toast('새 쿠폰판 시작! 첫 도장을 기다리고 있어요 🎟️');
+      }
+    });
   }
 
   function addSticker(emoji) {
@@ -799,7 +884,7 @@
     });
     if (state.stickers.length > 24) state.stickers.shift();
     save();
-    renderDecorate();
+    renderToshi();
     renderHero();
     sound('pop');
     toast(emoji + ' 스티커를 붙였어요!');
@@ -811,9 +896,45 @@
     if (i < 0) return;
     state.stickers.splice(i, 1);
     save();
-    renderDecorate();
+    renderToshi();
     renderHero();
     toast('스티커를 뗐어요');
+  }
+
+  function toggleSupply(which, id) {
+    var list = state.supplies[which] || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === id) { list[i].done = !list[i].done; break; }
+    }
+    save();
+    renderSupplies();
+    sound('pop');
+  }
+
+  function removeSupply(which, id) {
+    state.supplies[which] = (state.supplies[which] || []).filter(function (x) { return x.id !== id; });
+    save();
+    renderSupplies();
+    toast('준비물에서 지웠어요');
+  }
+
+  function addSupply(which) {
+    openForm({
+      title: which === 'today' ? '오늘 준비물 추가' : '내일 준비물 추가',
+      fields: [{
+        key: 'text', label: '무엇을 챙길까?', type: 'text', value: '',
+        maxlength: 20, placeholder: '예: 물통, 체육복, 우산'
+      }],
+      submitText: '추가',
+      onSubmit: function (v) {
+        var text = String(v.text || '').trim().slice(0, 20);
+        if (!text) { toast('준비물 이름을 적어 주세요'); return false; }
+        state.supplies[which].push({ id: uid('p'), text: text, done: false });
+        save();
+        renderSupplies();
+        toast('‘' + text + '’ 준비물에 추가했어요');
+      }
+    });
   }
 
   /* ---------------- dialogs ---------------- */
@@ -915,7 +1036,7 @@
     });
   }
 
-  /* ---------------- menu ---------------- */
+  /* ---------------- menu / views ---------------- */
   function openMenu() {
     var ov = $('#menu-overlay');
     if (!ov) return;
@@ -928,12 +1049,12 @@
     if (ov) ov.hidden = true;
   }
 
-  /* ---------------- views ---------------- */
-  var VIEWS = ['home', 'todo', 'stamp', 'schedule', 'decorate'];
+  var MAIN_VIEWS = ['home', 'toshi', 'coupon', 'record', 'supplies'];
+  var ALL_VIEWS = MAIN_VIEWS.concat(['todo', 'schedule']);
   var current = 'home';
 
   function go(view) {
-    if (VIEWS.indexOf(view) < 0) view = 'home';
+    if (ALL_VIEWS.indexOf(view) < 0) view = 'home';
     current = view;
     $$('.view').forEach(function (v) {
       var on = v.dataset.view === view;
@@ -947,9 +1068,9 @@
   }
 
   function stepView(dir) {
-    var i = VIEWS.indexOf(current);
+    var i = MAIN_VIEWS.indexOf(current);
     if (i < 0) i = 0;
-    go(VIEWS[(i + dir + VIEWS.length) % VIEWS.length]);
+    go(MAIN_VIEWS[(i + dir + MAIN_VIEWS.length) % MAIN_VIEWS.length]);
   }
 
   /* ---------------- image upload ---------------- */
@@ -1000,6 +1121,12 @@
       if (addSt) { addSticker(addSt.dataset.stickerAdd); return; }
       var rmSt = t.closest ? t.closest('[data-sticker]') : null;
       if (rmSt) { removeSticker(rmSt.dataset.sticker); return; }
+      var supCheck = t.closest ? t.closest('[data-supply]') : null;
+      if (supCheck) { toggleSupply(supCheck.dataset.supply, supCheck.dataset.sid); return; }
+      var supDel = t.closest ? t.closest('[data-supply-del]') : null;
+      if (supDel) { removeSupply(supDel.dataset.supplyDel, supDel.dataset.sid); return; }
+      var supAdd = t.closest ? t.closest('[data-add]') : null;
+      if (supAdd) { addSupply(supAdd.dataset.add); return; }
       var delSch = t.closest ? t.closest('[data-del]') : null;
       if (delSch) { e.stopPropagation(); askDeleteSchedule(delSch.dataset.del); return; }
       var goBtn = t.closest ? t.closest('[data-go]') : null;
@@ -1010,13 +1137,14 @@
 
     var nb = $('#nav-back'); if (nb) nb.addEventListener('click', function () { stepView(-1); });
     var nn = $('#nav-next'); if (nn) nn.addEventListener('click', function () { stepView(1); });
+    var bl = $('#btn-list'); if (bl) bl.addEventListener('click', openMenu);
     var bm = $('#btn-menu'); if (bm) bm.addEventListener('click', openMenu);
     var bmc = $('#btn-menu-close'); if (bmc) bmc.addEventListener('click', closeMenu);
     var mo = $('#menu-overlay');
     if (mo) mo.addEventListener('click', function (e) { if (e.target === mo) closeMenu(); });
 
     var bf = $('#btn-feed'); if (bf) bf.addEventListener('click', feed);
-    var bd = $('#btn-deco'); if (bd) bd.addEventListener('click', function () { go('decorate'); });
+    var bd = $('#btn-deco'); if (bd) bd.addEventListener('click', function () { go('toshi'); });
     var hc = $('#hero-char'); if (hc) hc.addEventListener('click', feed);
     var gb = $('#btn-group'); if (gb) gb.addEventListener('click', flipHeroGroup);
 
@@ -1047,13 +1175,9 @@
     });
 
     var ts = $('#btn-todo-stamp');
-    if (ts) ts.addEventListener('click', function () {
-      if (!allDone()) { toast('할 일을 다 하면 도장을 찍을 수 있어요! (' + doneCount() + '/' + totalTodos() + ')'); sound('nope'); return; }
-      go('stamp');
-    });
+    if (ts) ts.addEventListener('click', function () { go('coupon'); });
 
-    var bs = $('#btn-stamp'); if (bs) bs.addEventListener('click', stampToday);
-    var bw = $('#btn-reward'); if (bw) bw.addEventListener('click', claimWeekReward);
+    var bn = $('#btn-new-coupon'); if (bn) bn.addEventListener('click', startNewCoupon);
     var sa = $('#btn-sched-add'); if (sa) sa.addEventListener('click', function () { addSchedule(); });
 
     var fc = $('#file-char');
@@ -1062,7 +1186,7 @@
       handleFile(f);
       try { e.target.value = ''; } catch (err) {}
     });
-    var tu = $('#tile-upload');
+    var tu = $('#btn-upload-line');
     if (tu) tu.addEventListener('click', function () {
       closeMenu();
       var input = $('#file-char');
@@ -1100,7 +1224,7 @@
     if (reset) reset.addEventListener('click', function () {
       openConfirm({
         title: '처음부터 다시',
-        text: '할 일 체크, 먹이, 도장, 시간표, 올린 그림까지 모두 지우고 처음 상태로 돌아갑니다. 이 기기의 기록만 지워져요.',
+        text: '할 일 체크, 먹이, 쿠폰, 기록, 준비물, 올린 그림까지 모두 지우고 처음 상태로 돌아갑니다. 이 기기의 기록만 지워져요.',
         okText: '모두 지우기',
         onOk: function () {
           state = fresh();
@@ -1243,13 +1367,15 @@
   /* ---------------- start ---------------- */
   function start() {
     state = load();
-    if (rollDay()) save();
-    if (!state.seen) { state.seen = true; save(); }
+    rollDay();
+    if (!state.seen) state.seen = true;
+    if (!state.history[state.daily.date]) state.history[state.daily.date] = state.daily.done.length;
+    save();
     bind();
     renderAll();
     var h = '';
     try { h = (location.hash || '').replace('#', ''); } catch (e) {}
-    go(VIEWS.indexOf(h) >= 0 ? h : 'home');
+    go(ALL_VIEWS.indexOf(h) >= 0 ? h : 'home');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
