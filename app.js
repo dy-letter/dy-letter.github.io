@@ -377,6 +377,7 @@
   var CORDER = ['red', 'blue', 'yellow', 'green'];
   var CROT = [-2.4, 1.8, -1.4, 2.6];
   var CDY = [1, -2, 2, -1];
+  var CSC = [1, 0.96, 1.045, 0.975];
   var CSW = [25, 24, 26, 24];
   var CDW = 100, CGAP = 12, CCOLON = 40;
   var clockKey = '';
@@ -429,7 +430,7 @@
 
   function clockGlyph(ch, x, idx) {
     var t = CTEX[CORDER[idx % CORDER.length]], sw = CSW[idx % 4], d = CDIG[ch] || '';
-    return '<g transform="translate(' + x + ' 0) rotate(' + CROT[idx % 4] + ' 50 70) translate(0 ' + CDY[idx % 4] + ')">' +
+    return '<g transform="translate(' + x + ' 0) rotate(' + CROT[idx % 4] + ' 50 70) translate(50 70) scale(' + CSC[idx % 4] + ') translate(-50 -70) translate(0 ' + CDY[idx % 4] + ')">' +
       '<path d="' + d + '" fill="none" stroke="#FFFCF2" stroke-width="' + (sw + 19) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
       '<path d="' + d + '" fill="none" stroke="' + t.c + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round" opacity=".3" transform="translate(2.5 -1.5)"/>' +
       '<path d="' + d + '" fill="none" stroke="url(#' + t.p + ')" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>' +
