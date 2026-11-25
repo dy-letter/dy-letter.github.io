@@ -1,11 +1,11 @@
 {
   "name": "도윤이숲",
   "short_name": "도윤이숲",
-  "description": "아이만 쓰는 도윤이숲 대시보드 — 할 일 체크, 토시이 키우기, 도장판, 시간표",
+  "description": "아이만 쓰는 대시보드 — 할 일 체크, 토시이 키우기, 도장판, 시간표",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#FFF8E4",
+  "background_color": "#F7F7F1",
   "theme_color": "#DCEBF2",
   "icons": [
     { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
