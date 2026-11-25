@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>토시이 숲</title>
+<meta name="theme-color" content="#EAF7E2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="토시이 숲">
+<meta name="description" content="아이만 쓰는 토시이 숲 대시보드. 할 일 체크, 토시이 키우기, 도장판, 시간표.">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="icon" type="image/png" href="assets/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ============ HOME / HERO ============ -->
+  <section class="view is-active" id="view-home" data-view="home" aria-label="토시이 숲 홈">
+    <div class="hero" id="hero">
+      <div class="watermark" aria-hidden="true">TOSHII</div>
+
+      <header class="hero-top">
+        <div class="logo">
+          <span class="logo-mark" aria-hidden="true">🌿</span>
+          <span class="logo-text">토시이 숲</span>
+        </div>
+        <button class="menu-btn" id="btn-menu" aria-label="메뉴 열기" aria-haspopup="dialog">
+          <span class="menu-face"><img src="assets/toshii-default.png" alt=""></span>
+          <span class="menu-word">MENU</span>
+        </button>
+      </header>
+
+      <div class="hero-title">
+        <div class="clock" id="clock">--:--</div>
+        <div class="dateline">
+          <span id="today-date">오늘</span>
+          <span class="sep" aria-hidden="true">·</span>
+          <span id="next-hint">다음 일정을 찾는 중</span>
+        </div>
+      </div>
+
+      <div class="hero-stage">
+        <div class="todos-col" id="todos-col" data-count="6">
+          <button class="group-toggle" id="btn-group" aria-label="아침·저녁 루틴 바꾸기">
+            <span id="group-ico" aria-hidden="true">🌅</span>
+            <span id="group-name">아침</span>
+            <span id="group-count" class="gt-count">0/4</span>
+            <span class="gt-flip" aria-hidden="true">↻</span>
+          </button>
+          <div class="hero-todos" id="hero-todos" role="group" aria-label="오늘 할 일 체크리스트"></div>
+        </div>
+
+        <div class="center-col">
+          <div class="char-stage" id="char-stage">
+            <div class="sticker-layer" id="hero-stickers" aria-hidden="true"></div>
+            <img class="char-img" id="hero-char" src="assets/toshii-default.png" alt="토시이">
+            <div class="fx-layer" id="fx-layer" aria-hidden="true"></div>
+          </div>
+
+          <div class="gauge-wrap" id="gauge-wrap">
+            <div class="day-gauge" id="day-gauge" role="progressbar" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0" aria-label="오늘 할 일 10칸 진행"></div>
+            <span class="gauge-count" id="gauge-count">0/10</span>
+          </div>
+
+          <div class="name-row">
+            <button class="nav-pill nav-back" id="nav-back" aria-label="이전 화면">
+              <span class="np-ico" aria-hidden="true">⊕</span><span class="np-txt">BACK</span>
+            </button>
+            <div class="name-block">
+              <h1 class="name" id="hero-name">토시이<span class="age">· 15살</span></h1>
+              <div class="name-badges" id="hero-badges">
+                <span class="badge-pill" id="badge-level">Lv.1</span>
+                <span class="badge-pill" id="badge-growth">먹이 0</span>
+              </div>
+            </div>
+            <button class="nav-pill nav-next" id="nav-next" aria-label="다음 화면">
+              <span class="np-txt">NEXT</span><span class="np-ico" aria-hidden="true">ⓘ</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="side-col">
+          <button class="round-btn" id="btn-feed" aria-label="토시이에게 먹이 주기">
+            <span aria-hidden="true">🍖</span>
+            <span class="badge" id="feed-badge">0</span>
+          </button>
+          <button class="round-btn" id="btn-deco" aria-label="토시이 꾸미기">
+            <span aria-hidden="true">💎</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="dino" itemscope itemtype="https://schema.org/Message">
+        <div class="dino-head">
+          <span class="dino-title">🦖 공룡선생님 한마디</span>
+          <div class="dino-tools">
+            <button class="chip-btn" id="btn-dino-random" aria-label="다른 한마디 보기">↻ 다른 말</button>
+            <button class="chip-btn" id="btn-dino-edit" aria-label="한마디 직접 쓰기">✎ 쓰기</button>
+          </div>
+        </div>
+        <p class="dino-text" id="dino-text">오늘도 숲에서 기다리고 있었어. 할 일 하나씩 해 보자!</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TODO ============ -->
+  <section class="view" id="view-todo" data-view="todo" aria-label="오늘 할 일" hidden>
+    <div class="panel">
+      <header class="panel-head">
+        <button class="panel-back" data-go="home" aria-label="숲으로 돌아가기">←</button>
+        <div class="panel-title">
+          <h2>✅ 오늘 할 일</h2>
+          <p class="panel-sub" id="todo-sub">끝낼 때마다 먹이 1개!</p>
+        </div>
+        <div class="panel-index"><span id="todo-count">0/5</span></div>
+      </header>
+      <div class="panel-body">
+        <div class="progress-card">
+          <div class="progress-top">
+            <strong id="progress-label">오늘 0개 끝냈어요</strong>
+            <span id="progress-feeds">먹이 0개 모았어요</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
+        <div class="task-list" id="todo-list"></div>
+        <p class="hint-line">이름과 그림을 바꾸려면 항목 오른쪽 <b>✎</b> 를 눌러요.</p>
+      </div>
+      <footer class="panel-foot">
+        <button class="big-btn" id="btn-todo-stamp">⭐ 다 했으면 도장 찍으러 가기</button>
+      </footer>
+    </div>
+  </section>
+
+  <!-- ============ STAMP ============ -->
+  <section class="view" id="view-stamp" data-view="stamp" aria-label="도장판" hidden>
+    <div class="panel">
+      <header class="panel-head">
+        <button class="panel-back" data-go="home" aria-label="숲으로 돌아가기">←</button>
+        <div class="panel-title">
+          <h2>⭐ 도장·스티커판</h2>
+          <p class="panel-sub" id="stamp-sub">하루 목표를 다 채우면 도장을 찍어요</p>
+        </div>
+        <div class="panel-index"><span id="gem-count">💎 0</span></div>
+      </header>
+      <div class="panel-body">
+        <div class="stamp-hero">
+          <div class="stamp-today" id="stamp-today">
+            <div class="stamp-face" id="stamp-face" aria-hidden="true">🐾</div>
+            <div class="stamp-copy">
+              <strong id="stamp-title">오늘 도장</strong>
+              <span id="stamp-desc">할 일 5개를 다 하면 찍을 수 있어요</span>
+            </div>
+          </div>
+          <button class="big-btn stamp-btn" id="btn-stamp">오늘 도장 찍기</button>
+        </div>
+
+        <h3 class="section-h">이번 주 도장판</h3>
+        <div class="week-grid" id="week-grid"></div>
+
+        <div class="reward-row">
+          <div class="reward-copy">
+            <strong id="reward-title">이번 주 0/5 도장</strong>
+            <span>도장 5개를 모으면 보석 5개!</span>
+          </div>
+          <button class="big-btn small" id="btn-reward" disabled>보석 받기</button>
+        </div>
+
+        <h3 class="section-h">칭찬 스티커</h3>
+        <div class="sticker-shelf" id="sticker-shelf"></div>
+        <p class="hint-line panel-note">도장은 하루에 한 번, 할 일 10개를 모두 끝내면 찍을 수 있어요. 월요일부터 새 도장판이 시작돼요.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCHEDULE ============ -->
+  <section class="view" id="view-schedule" data-view="schedule" aria-label="오늘 시간표" hidden>
+    <div class="panel">
+      <header class="panel-head">
+        <button class="panel-back" data-go="home" aria-label="숲으로 돌아가기">←</button>
+        <div class="panel-title">
+          <h2>⏰ 오늘 시간표</h2>
+          <p class="panel-sub" id="sched-sub">다음 일정까지 남은 시간을 세고 있어요</p>
+        </div>
+        <div class="panel-index"><span id="now-time">--:--</span></div>
+      </header>
+      <div class="panel-body">
+        <div class="countdown-card">
+          <span class="cd-label" id="cd-label">다음 일정</span>
+          <strong class="cd-main" id="cd-main">--</strong>
+          <span class="cd-sub" id="cd-sub">시간표를 확인해요</span>
+          <div class="progress-track slim"><div class="progress-fill" id="cd-fill"></div></div>
+        </div>
+        <div class="sched-list" id="sched-list"></div>
+        <button class="big-btn ghost" id="btn-sched-add">＋ 일정 추가</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DECORATE ============ -->
+  <section class="view" id="view-decorate" data-view="decorate" aria-label="토시이 꾸미기" hidden>
+    <div class="panel">
+      <header class="panel-head">
+        <button class="panel-back" data-go="home" aria-label="숲으로 돌아가기">←</button>
+        <div class="panel-title">
+          <h2>💎 토시이 꾸미기</h2>
+          <p class="panel-sub">내 그림으로 바꾸고 스티커를 붙여요</p>
+        </div>
+        <div class="panel-index"><span id="deco-gems">💎 0</span></div>
+      </header>
+      <div class="panel-body deco-body">
+        <div class="deco-preview">
+          <div class="deco-stage" id="deco-stage">
+            <div class="deco-bg" aria-hidden="true"></div>
+            <img class="deco-img" id="deco-img" src="assets/toshii-default.png" alt="토시이">
+            <div class="sticker-layer" id="deco-stickers"></div>
+          </div>
+          <div class="deco-meta">
+            <strong id="deco-level">Lv.1 아기 토시이</strong>
+            <span id="deco-growth">누적 먹이 0개</span>
+            <div class="progress-track slim"><div class="progress-fill" id="deco-fill"></div></div>
+            <span class="deco-next" id="deco-next">다음 성장까지 먹이 5개</span>
+          </div>
+        </div>
+
+        <div class="deco-controls">
+          <h3 class="section-h">내 그림으로 바꾸기</h3>
+          <div class="upload-row">
+            <label class="big-btn file-btn" for="file-char">🖼 그림 올리기
+              <input type="file" id="file-char" accept="image/*" hidden>
+            </label>
+            <button class="big-btn ghost small" id="btn-char-reset">기본 그림</button>
+          </div>
+          <p class="hint-line">휴대폰 사진첩에서 토시이 그림을 고르면 바로 바뀌어요. (그림은 이 기기에만 저장돼요)</p>
+
+          <h3 class="section-h">스티커 붙이기</h3>
+          <div class="sticker-shelf" id="deco-shelf"></div>
+          <div class="upload-row">
+            <button class="big-btn ghost small" id="btn-clear-stickers">스티커 모두 떼기</button>
+            <span class="hint-inline">붙인 스티커를 누르면 떨어져요</span>
+          </div>
+
+          <h3 class="section-h">도감</h3>
+          <div class="book-grid" id="book-grid"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ MENU SHEET ============ -->
+<div class="overlay" id="menu-overlay" role="dialog" aria-modal="true" aria-label="메뉴" hidden>
+  <div class="sheet menu-sheet">
+    <div class="sheet-head">
+      <h2>토시이 숲 메뉴</h2>
+      <button class="close-btn" id="btn-menu-close" aria-label="메뉴 닫기">✕</button>
+    </div>
+    <div class="menu-grid" id="menu-grid">
+      <button class="menu-tile" data-go="todo"><span class="mt-ico">✅</span><span class="mt-txt">오늘 할 일</span></button>
+      <button class="menu-tile" data-go="stamp"><span class="mt-ico">⭐</span><span class="mt-txt">도장판</span></button>
+      <button class="menu-tile" data-go="schedule"><span class="mt-ico">⏰</span><span class="mt-txt">시간표</span></button>
+      <button class="menu-tile" data-go="decorate"><span class="mt-ico">💎</span><span class="mt-txt">꾸미기</span></button>
+      <button class="menu-tile" id="tile-upload"><span class="mt-ico">🖼</span><span class="mt-txt">그림 바꾸기</span></button>
+      <button class="menu-tile" data-go="home"><span class="mt-ico">🌿</span><span class="mt-txt">숲으로</span></button>
+    </div>
+    <div class="menu-list">
+      <button class="menu-line" id="btn-sound">
+        <span>소리</span><span class="ml-value" id="sound-value">켜짐 🔊</span>
+      </button>
+      <button class="menu-line" id="btn-todo-reset">
+        <span>할 일 이름 되돌리기</span><span class="ml-value">기본 10개로</span>
+      </button>
+      <button class="menu-line" id="btn-data-reset">
+        <span>처음부터 다시</span><span class="ml-value">기록 지우기</span>
+      </button>
+      <div class="menu-note">모든 기록은 이 기기 브라우저에 자동 저장돼요.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ FORM DIALOG ============ -->
+<div class="overlay" id="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="dialog-title" hidden>
+  <div class="sheet dialog-sheet">
+    <div class="sheet-head">
+      <h2 id="dialog-title">고치기</h2>
+      <button class="close-btn" id="btn-dialog-close" aria-label="닫기">✕</button>
+    </div>
+    <form class="dialog-form" id="dialog-form">
+      <div class="dialog-fields" id="dialog-fields"></div>
+      <div class="dialog-actions">
+        <button type="button" class="big-btn ghost" id="btn-dialog-cancel">그만두기</button>
+        <button type="submit" class="big-btn" id="btn-dialog-save">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- celebrate confetti-ish layer -->
+<div class="celebrate-layer" id="celebrate-layer" aria-hidden="true"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
